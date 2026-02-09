@@ -29,6 +29,7 @@ class _PokemonDetailScreenState extends State<PokemonDetailScreen>
   
   Offset _dragOffset = Offset.zero;
   bool _isDragging = false;
+  bool _isPlaying = true;
 
   @override
   void initState() {
@@ -168,6 +169,44 @@ class _PokemonDetailScreenState extends State<PokemonDetailScreen>
                               fontWeight: FontWeight.bold,
                             ),
                           ),
+                          // Animation control buttons
+                          Row(
+                            children: [
+                              // Play button
+                              IconButton(
+                                onPressed: _isPlaying
+                                    ? null
+                                    : () {
+                                        setState(() => _isPlaying = true);
+                                        _rotateController.repeat();
+                                      },
+                                icon: const Icon(Icons.play_arrow),
+                                color:
+                                    _isPlaying ? Colors.grey : Colors.white,
+                              ),
+                              // Pause button
+                              IconButton(
+                                onPressed: !_isPlaying
+                                    ? null
+                                    : () {
+                                        setState(() => _isPlaying = false);
+                                        _rotateController.stop();
+                                      },
+                                icon: const Icon(Icons.pause),
+                                color:
+                                    !_isPlaying ? Colors.grey : Colors.white,
+                              ),
+                              // Stop button
+                              IconButton(
+                                onPressed: () {
+                                  setState(() => _isPlaying = false);
+                                  _rotateController.reset();
+                                },
+                                icon: const Icon(Icons.stop_circle),
+                                color: Colors.white,
+                              ),
+                            ],
+                          ),
                         ],
                       ),
                       // Name
@@ -225,27 +264,30 @@ class _PokemonDetailScreenState extends State<PokemonDetailScreen>
                               offset: _isDragging
                                   ? _dragOffset
                                   : _springAnimation.value,
-                              child: child,
+                              child: Transform(
+                                alignment: Alignment.center,
+                                transform: Matrix4.identity()
+                                  ..setEntry(3, 2, 0.001)
+                                  ..rotateY(_rotateController.value * 2 * 3.14159),
+                                child: child,
+                              ),
                             );
                           },
-                          child: RotationTransition(
-                            turns: _rotateController,
-                            child: Hero(
-                              tag: 'pokemon-${pokemon.id}',
-                              child: CachedNetworkImage(
-                                imageUrl: pokemon.imageUrl,
-                                height: 200,
-                                width: 200,
-                                fit: BoxFit.contain,
-                                placeholder: (_, __) =>
-                                    const CircularProgressIndicator(
-                                      color: Colors.white,
-                                    ),
-                                errorWidget: (_, __, ___) => const Icon(
-                                  Icons.catching_pokemon,
-                                  size: 120,
-                                  color: Colors.white,
-                                ),
+                          child: Hero(
+                            tag: 'pokemon-${pokemon.id}',
+                            child: CachedNetworkImage(
+                              imageUrl: pokemon.imageUrl,
+                              height: 200,
+                              width: 200,
+                              fit: BoxFit.contain,
+                              placeholder: (_, __) =>
+                                  const CircularProgressIndicator(
+                                    color: Colors.white,
+                                  ),
+                              errorWidget: (_, __, ___) => const Icon(
+                                Icons.catching_pokemon,
+                                size: 120,
+                                color: Colors.white,
                               ),
                             ),
                           ),
