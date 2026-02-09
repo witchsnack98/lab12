@@ -22,8 +22,13 @@ class _PokemonDetailScreenState extends State<PokemonDetailScreen>
     with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late AnimationController _rotateController;
+  late AnimationController _springController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  late Animation<Offset> _springAnimation;
+  
+  Offset _dragOffset = Offset.zero;
+  bool _isDragging = false;
 
   @override
   void initState() {
@@ -38,6 +43,15 @@ class _PokemonDetailScreenState extends State<PokemonDetailScreen>
       duration: const Duration(seconds: 8),
       vsync: this,
     )..repeat();
+
+    // Spring animation controller
+    _springController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+
+    _springAnimation = Tween<Offset>(begin: Offset.zero, end: Offset.zero)
+        .animate(CurvedAnimation(parent: _springController, curve: Curves.elasticOut));
 
     // Fade in delayed (เพื่อให้ Hero animation เล่นจบก่อน)
     _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
@@ -61,10 +75,37 @@ class _PokemonDetailScreenState extends State<PokemonDetailScreen>
     _fadeController.forward();
   }
 
+  void _onDragUpdate(DragUpdateDetails details) {
+    if (!_isDragging) return;
+    setState(() {
+      _dragOffset += details.delta;
+    });
+  }
+
+  void _onDragEnd(DragEndDetails details) {
+    _isDragging = false;
+
+    // สร้าง animation กลับไปตำแหน่งเดิมด้วย elasticOut curve
+    _springAnimation = Tween<Offset>(
+      begin: _dragOffset,
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _springController,
+      curve: Curves.elasticOut,
+    ));
+
+    _springController.forward(from: 0.0).then((_) {
+      setState(() {
+        _dragOffset = Offset.zero;
+      });
+    });
+  }
+
   @override
   void dispose() {
     _fadeController.dispose();
     _rotateController.dispose();
+    _springController.dispose();
     super.dispose();
   }
 
@@ -168,24 +209,44 @@ class _PokemonDetailScreenState extends State<PokemonDetailScreen>
                             }).toList(),
                       ),
                       const SizedBox(height: 16),
-                      // Hero image with rotation
-                      RotationTransition(
-                        turns: _rotateController,
-                        child: Hero(
-                          tag: 'pokemon-${pokemon.id}',
-                          child: CachedNetworkImage(
-                            imageUrl: pokemon.imageUrl,
-                            height: 200,
-                            width: 200,
-                            fit: BoxFit.contain,
-                            placeholder: (_, __) =>
-                                const CircularProgressIndicator(
+                      // Hero image with spring animation on drag
+                      GestureDetector(
+                        onHorizontalDragStart: (_) {
+                          _springController.stop();
+                          setState(() => _isDragging = true);
+                        },
+                        onHorizontalDragUpdate: _onDragUpdate,
+                        onHorizontalDragEnd: _onDragEnd,
+                        child: AnimatedBuilder(
+                          animation:
+                              Listenable.merge([_springAnimation, _rotateController]),
+                          builder: (context, child) {
+                            return Transform.translate(
+                              offset: _isDragging
+                                  ? _dragOffset
+                                  : _springAnimation.value,
+                              child: child,
+                            );
+                          },
+                          child: RotationTransition(
+                            turns: _rotateController,
+                            child: Hero(
+                              tag: 'pokemon-${pokemon.id}',
+                              child: CachedNetworkImage(
+                                imageUrl: pokemon.imageUrl,
+                                height: 200,
+                                width: 200,
+                                fit: BoxFit.contain,
+                                placeholder: (_, __) =>
+                                    const CircularProgressIndicator(
+                                      color: Colors.white,
+                                    ),
+                                errorWidget: (_, __, ___) => const Icon(
+                                  Icons.catching_pokemon,
+                                  size: 120,
                                   color: Colors.white,
                                 ),
-                            errorWidget: (_, __, ___) => const Icon(
-                              Icons.catching_pokemon,
-                              size: 120,
-                              color: Colors.white,
+                              ),
                             ),
                           ),
                         ),
